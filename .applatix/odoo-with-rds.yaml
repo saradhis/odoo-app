@@ -1,0 +1,115 @@
+---
+type: container
+name: odoo-rds-container
+
+inputs:
+  parameters:
+    vol_app:
+    dbhost:
+
+container:
+  image: "odoo:latest"
+  docker_options: "-e HOST=%%dbhost%% -e USER=odoo -e PASSWORD=password"
+  resources:
+    mem_mib: 1024
+    cpu_cores: 0.5
+
+volume_mounts:
+  - mount_path: /var/lib/odoo
+    volume: "%%vol_app%%"
+
+
+---
+type: deployment
+name: odoo-rds-deployment-with-vols
+description: Odoo deployment
+
+application:
+  name: "%%appname%%"
+deployment:
+  name: "odoo-deploy"
+
+inputs:
+  parameters:
+    appname:
+        default: "odoo-app-vol"
+    app-vol-name:
+    dbhost:
+
+volumes:
+  app:
+    name: "%%app-vol-name%%"
+
+scale:
+  min: 1
+external_routes:
+  - name: "odoo"
+    dns_prefix: "odoords"
+    target_port: 8069
+    redirect_http_to_https: true
+    ip_white_list:
+      - 0.0.0.0/0
+
+containers:
+  - server:
+      template: odoo-rds-container
+      parameters:
+        vol_app: "%%volumes.app%%"
+        dbhost:
+
+---
+type: container
+name: mytest-rds-container
+
+inputs:
+  parameters:
+    vol_app:
+
+container:
+  image: "ubuntu"
+  command: "sleep 3000"
+  resources:
+    mem_mib: 1024
+    cpu_cores: 0.5
+
+volume_mounts:
+  - mount_path: /var
+    volume: "%%vol_app%%"
+
+---
+type: deployment
+name: mytestrds324
+
+application:
+  name: mytest324
+deployment:
+  name: "mytest324"
+
+volumes:
+  app:
+    name: "odoo-rds"
+
+containers:
+  - server:
+      template: mytest-rds-container
+      parameters:
+        vol_app: "%%volumes.app%%"
+
+---
+type: workflow
+name: Odoo_workflow_with_rds
+description: This is the workflow to deploy Odoo
+
+inputs:
+  parameters:
+    appname:
+      default: "odoo-rds-with-vols"
+    app-vol-name:
+      default: "odoo-rds"
+    dbhost:
+
+steps:
+#  - odoo-test:
+#        template: mytestrds324
+  - deploy-odoo:
+        template: odoo-rds-deployment-with-vols

@@ -1,0 +1,23 @@
+---
+type: project
+name: Stateful Apps
+description: Stateful apps with  persistent volume
+actions:
+  -
+    name: deploy Odoo with volumes
+    template: Odoo_workflow_with_volumes
+
+  -
+   name: deploy Odoo with RDS
+   template: Odoo_workflow_with_rds
+categories: ["demo", "promoted"]
+publish:
+  branches:
+    - master
+labels:
+    tags: "[\"demo\"]"
+    publisher: Applatix
+assets:
+    icon: "/stateful.png"
+    publisher_icon: "/AX_Pub.png"
+    detail: "/README.md"

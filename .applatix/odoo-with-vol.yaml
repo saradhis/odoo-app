@@ -1,0 +1,168 @@
+---
+type: container
+name: odoo-container
+
+inputs:
+  parameters:
+    vol_app:
+
+container:
+  image: "odoo:latest"
+  resources:
+    mem_mib: 1024
+    cpu_cores: 0.5
+
+volume_mounts:
+  - mount_path: /var/lib/odoo
+    volume: "%%vol_app%%"
+
+---
+type: container
+name: postgres-container
+
+inputs:
+  parameters:
+    vol_data:
+
+container:
+  image: "postgres:9.4"
+  docker_options: "-e PGDATA=/var/lib/postgresql/data/pgdata -e POSTGRES_USER=odoo -e POSTGRES_PASSWORD=odoo"
+  resources:
+    mem_mib: 1024
+    cpu_cores: 0.5
+
+volume_mounts:
+  - mount_path: /var/lib/postgresql/data
+    volume: "%%vol_data%%"
+
+---
+type: deployment
+name: postgres-deployment-with-vol
+description: Postgres deployment
+
+application:
+  name: "%%appname%%"
+deployment:
+  name: "postgres-deployment"
+
+inputs:
+  parameters:
+    appname:
+      default: "odoo-app-vol"
+    data-vol-name:
+
+volumes:
+  data:
+    name: "%%data-vol-name%%"
+
+scale:
+  min: 1
+internal_routes:
+  - name: db
+    ports:
+      - name: tcp
+        port: 5432
+        target_port: 5432
+
+containers:
+  - server:
+      template: postgres-container
+      parameters:
+        vol_data: "%%volumes.data%%"
+
+---
+type: deployment
+name: odoo-deployment-with-vols
+description: Odoo deployment
+
+application:
+  name: "%%appname%%"
+deployment:
+  name: "odoo-deploy"
+
+inputs:
+  parameters:
+    appname:
+        default: "odoo-app-vol"
+    app-vol-name:
+
+volumes:
+  app:
+    name: "%%app-vol-name%%"
+
+scale:
+  min: 1
+external_routes:
+  - name: "odoo"
+    dns_prefix: "odoo"
+    target_port: 8069
+    redirect_http_to_https: true
+    ip_white_list:
+      - 0.0.0.0/0
+
+containers:
+  - server:
+      template: odoo-container
+      parameters:
+        vol_app: "%%volumes.app%%"
+
+
+---
+type: container
+name: mytest-container
+
+inputs:
+  parameters:
+    vol_app:
+
+container:
+  image: "ubuntu"
+  command: "sleep 3000"
+  resources:
+    mem_mib: 1024
+    cpu_cores: 0.5
+
+volume_mounts:
+  - mount_path: /var
+    volume: "%%vol_app%%"
+
+---
+type: deployment
+name: mytest324
+
+application:
+  name: mytest324
+deployment:
+  name: "mytest324"
+
+volumes:
+  app:
+    name: "odoo"
+
+containers:
+  - server:
+      template: mytest-container
+      parameters:
+        vol_app: "%%volumes.app%%"
+
+---
+type: workflow
+name: Odoo_workflow_with_volumes
+description: This is the workflow to load Odoo data into postgres
+
+inputs:
+  parameters:
+    appname:
+      default: "odoo-with-vols"
+    data-vol-name:
+      default: "postgres"
+    app-vol-name:
+      default: "odoo"
+
+steps:
+#  - odoo-test:
+#        template: mytest324
+  - deploy-postgres:
+        template: postgres-deployment-with-vol
+  - deploy-odoo:
+        template: odoo-deployment-with-vols
